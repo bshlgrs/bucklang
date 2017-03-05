@@ -32,7 +32,7 @@ sealed abstract class BlExpression {
         case Some(x) => x
       }
     case NameExpr(name) =>
-      scope.varsPlusVals.get(name) match {
+      scope.get(name) match {
         case Some(x) => x
         case None => throw new RuntimeException(s"Variable $name is undefined")
       }

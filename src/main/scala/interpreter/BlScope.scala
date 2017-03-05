@@ -57,4 +57,5 @@ class BlScope(thisVal: Option[BlObject],
 }
 
 object BlScope {
+  val globalScope = new BlScope(None, None)
 }

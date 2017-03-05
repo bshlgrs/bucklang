@@ -36,7 +36,9 @@ abstract class BlValue {
   def inbuiltMethods: Map[String, InbuiltMethod]
 
   val universalMethods = Map[String, InbuiltMethod](
-    "&&" -> (1 -> {case List(x: BlValue) => this.and(x) })
+    "&&" -> (1 -> {case List(x: BlValue) => this.and(x) }),
+    "==" -> (1 -> {case List(x: BlValue) => BlBool(this == x) }),
+    "!=" -> (1 -> {case List(x: BlValue) => BlBool(this != x) })
   )
 
   def and(other: BlValue): BlValue = {

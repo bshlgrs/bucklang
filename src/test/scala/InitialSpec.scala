@@ -23,19 +23,45 @@ class InitialSpec extends FunSpec  {
   }
 
   describe("Running blocks") {
+
+    def parseAndRunBlock(blockString: String): BlValue = {
+      val parsedCode: List[BlStatement] = Parser.nakedBlockOfStatements.parse(blockString).get.value
+
+      BlStatement.evalBlock(new BlScope(None, Some(GlobalScope)), parsedCode).getOrElse(BlNull)
+    }
+
     it("works") {
       val code =
-        """{
-          |  val x = 5;
-          |  val y = 3;
-          |
-          |  return x + y;
-          |}
+        """
+           val x = range(10);
+
+           return x.size * 5;
         """.stripMargin
 
-      val parsedCode: List[BlStatement] = Parser.functionBody.parse(code).get.value
+      assert(parseAndRunBlock(code) == BlInt(50))
+    }
 
-      println(BlStatement.evalBlock(GlobalScope, parsedCode))
+
+    it("can do function definition") {
+      val code =
+        """
+           val f = (x) => x * 5;
+
+           return f(5);
+        """.stripMargin
+
+      assert(parseAndRunBlock(code) == BlInt(25))
+    }
+
+    it("can do another function definition") {
+      val code =
+        """
+           val factorial = (x) => { if (x == 0) { return 1; } else { return x * factorial(x - 1); } };
+
+           return factorial(10);
+        """.stripMargin
+
+      assert(parseAndRunBlock(code) == BlInt(3628800))
     }
   }
 

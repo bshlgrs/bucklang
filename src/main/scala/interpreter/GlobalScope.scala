@@ -5,6 +5,7 @@ package interpreter
   */
 object GlobalScope extends BlScope(None, None) {
   declareVal("range", range)
+  declareVal("List", BlListClass)
 
   object range extends BlCallable {
     def call(params: List[BlValue]): BlValue = params match {

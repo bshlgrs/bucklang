@@ -21,6 +21,13 @@ abstract class BlStatement {
         None
       }
     }
+    case IfStatement(cond, thenCase, elseCase) => {
+      if (cond.eval(scope).truthy) {
+        BlStatement.evalBlock(scope, thenCase)
+      } else {
+        BlStatement.evalBlock(scope, elseCase)
+      }
+    }
   }
 }
 
@@ -43,3 +50,4 @@ case class FieldSetStatement(lhs: BlExpression, field: String, rhs: BlExpression
 case class ExprStatement(exp: BlExpression) extends BlStatement
 case class ReturnStatement(value: Option[BlExpression]) extends BlStatement
 case class WhileStatement(cond: BlExpression, body: List[BlStatement]) extends BlStatement
+case class IfStatement(cond: BlExpression, thenCase: List[BlStatement], elseCase: List[BlStatement]) extends BlStatement

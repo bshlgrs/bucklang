@@ -20,16 +20,63 @@ class ParserSpec extends FunSpec  {
       assert(parse("x + y * z") == parse("x + (y * z)"))
       assert(parse("x * y + z") == parse("(x * y) + z"))
     }
+
+//    case class LiteralExpr(blValue: BlValue) extends BlExpression
+//    case class MethodCallExpr(calleeExpr: BlExpression,
+//                              name: String,
+//                              args: List[BlFunctionArgument]) extends BlExpression
+//    case class FunctionCallExpr(functionExpr: BlExpression, args: List[BlFunctionArgument]) extends BlExpression
+//    case class FieldAccessExpr(callee: BlExpression, name: String) extends BlExpression
+//    case object ThisExpr extends BlExpression
+//    case class NameExpr(name: String) extends BlExpression
+//    case class FunctionDefinitionExpr(args: ArrayDestructurePattern,
+//                                      defaultVals: Map[String, BlValue],
+//                                      body: List[BlStatement]) extends BlExpression
+
+    it ("can do literal exprs" ) {
+      assert(parse("123").isInstanceOf[LiteralExpr])
+    }
+
+    it ("can do array literals") {
+      val expr = parse("[1, 2, 3]").asInstanceOf[FunctionCallExpr]
+      assert(expr.functionExpr == LiteralExpr(BlListClass))
+    }
+
+    it ("can do method calls") {
+      val expr = parse("foo.bar()").asInstanceOf[MethodCallExpr]
+      assert(expr.calleeExpr == NameExpr("foo"))
+      assert(expr.name == "bar")
+      assert(expr.args.isEmpty)
+
+      assert(parse("y + z(foo, bar, zaz(4))").isInstanceOf[MethodCallExpr])
+    }
+
+    it ("can do function calls") {
+      assert(parse("foo(bar)(baz)").isInstanceOf[FunctionCallExpr])
+    }
+
+    it ("can do field accesses") {
+      assert(parse("a.b().c").isInstanceOf[FieldAccessExpr])
+    }
+
+    it ("can do this expr") {
+      assert(parse("this") == ThisExpr)
+    }
+
+    it ("can do name expr") {
+      assert(parse("foo").asInstanceOf[NameExpr].name == "foo")
+    }
+
+    it ("can do function definition exprs") {
+      assert(parse("(x, y) => x + y").isInstanceOf[FunctionDefinitionExpr])
+      assert(parse("(x, y) => { val z = x + y; return x + z * z; }").isInstanceOf[FunctionDefinitionExpr])
+      assert(parse("(x) => { val z = x + y; return x + z * z; }").isInstanceOf[FunctionDefinitionExpr])
+      assert(parse("(x) => { if (x == 0) { return 1; } else { return x * factorial(x - 1); } }").isInstanceOf[FunctionDefinitionExpr])
+    }
   }
 
   describe("Parsing statements") {
-//    case ValDeclStatement(lhs, rhs) => scope.declareVals(lhs.destructure(rhs.eval(scope)).get) ; None
-//    case VarDeclStatement(lhs, rhs) => scope.declareVar(lhs, rhs.eval(scope)); None
-//    case VarSetStatement(lhs, rhs) => scope.set(lhs, rhs.eval(scope)); None
-//    case FieldSetStatement(lhs, field, rhs) => lhs.eval(scope).setField(field, rhs.eval(scope)) ; None
-//    case ExprStatement(exp) => exp.eval(scope); None
-//    case ReturnStatement(value) => Some(value.map(_.eval(scope)).getOrElse(BlNull))
-//    case WhileStatement(cond, body) => {
+
     val stmtParser = Parser.nakedStmt
     def parse(string: String): BlStatement = {
       stmtParser.parse(string).get.value
@@ -38,6 +85,7 @@ class ParserSpec extends FunSpec  {
     it("can do val decl statements") {
       assert(parse("val x = y;").isInstanceOf[ValDeclStatement])
       assert(parse("val x = y + z(foo, bar, zaz(4));").isInstanceOf[ValDeclStatement])
+      assert(parse("val [z, q] = foo;").isInstanceOf[ValDeclStatement])
       assert(parse("val [z, q] = y + z(foo, bar, zaz(4));").isInstanceOf[ValDeclStatement])
       assert(parse("val [z, q, ...arg, ff] = y + z(foo, bar, zaz(4));").isInstanceOf[ValDeclStatement])
     }
@@ -64,6 +112,11 @@ class ParserSpec extends FunSpec  {
 
     it("can do while statements") {
       assert(parse("while(something) { y(sdfsdf) + fds; } ").isInstanceOf[WhileStatement])
+    }
+
+    it("can do if statements") {
+      assert(parse("if(something) { y(sdfsdf) + fds; } ").isInstanceOf[IfStatement])
+      assert(parse("if(something) { y(sdfsdf) + fds; } else { foo; bar; bz; }").isInstanceOf[IfStatement])
     }
   }
 

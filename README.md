@@ -19,7 +19,7 @@ Key features:
       
       addPiece(player, x) {
         val y = this.board.count(([x2, y]) => x == x2);
-        this.board.set([x, y], player);
+        this.board = this.board.set([x, y], player);
       }
       
       toString() {

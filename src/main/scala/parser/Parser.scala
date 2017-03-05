@@ -5,12 +5,15 @@ package parser
   */
 
 import fastparse.WhitespaceApi
+import fastparse.all._
 import interpreter._
 
 object Parser {
+  lazy val myWhitespace = CharIn(" ", "\n").rep
+
   val White = WhitespaceApi.Wrapper{
     import fastparse.all._
-    NoTrace(CharIn(" ", "\n").rep)
+    NoTrace(myWhitespace)
   }
   import White._
   import fastparse.noApi._
@@ -75,18 +78,25 @@ object Parser {
       MethodCallExpr(lhs, "||", List(LiteralFunctionArgument(FunctionDefinitionExpr.lazyWrap(rhs))))
   })
 
-
   lazy val functionArgument: P[BlFunctionArgument] =
     P(expr.map(LiteralFunctionArgument) | ("..." ~ expr).map({ case (x) => SplatFunctionArgument(x)}))
 
+  lazy val functionDefinitionExpr: P[BlExpression] = P(
+    "(" ~ arrayDestructurePatternInner ~ ")" ~ "=>" ~ (exprLevel9 | "{" ~ blockOfStatements ~ "}")).map({
+    case (a: ArrayDestructurePattern, expr: BlExpression) => FunctionDefinitionExpr(a, Map(), List(ReturnStatement(Some(expr))))
+    case (a: ArrayDestructurePattern, block: List[BlStatement]) => FunctionDefinitionExpr(a, Map(), block)
+  })
 
-  lazy val expr: P[BlExpression] = exprLevel8
+  lazy val exprLevel9: P[BlExpression] = P(functionDefinitionExpr | exprLevel8)
 
-  lazy val nakedExpr: P[BlExpression] = expr ~ End
+  lazy val expr: P[BlExpression] = exprLevel9
+
+  lazy val nakedExpr: P[BlExpression] = naked(expr)
 
   lazy val simplePattern: P[BlPattern] = P(name).map(SingleVariablePattern)
-  lazy val arrayDestructurePattern: P[BlPattern] = P(
-    "[" ~ pattern.rep(sep=",") ~ ("," ~ "..." ~ name ~ ("," ~ pattern).rep).? ~ "]").map({
+
+  lazy val arrayDestructurePattern = P("[" ~ arrayDestructurePatternInner ~ "]")
+  lazy val arrayDestructurePatternInner: P[BlPattern] = P(pattern.rep(sep=",") ~ ("," ~ "..." ~ name ~ ("," ~ pattern).rep).?).map({
     case (initials, splat) => ArrayDestructurePattern(initials.toList, splat.map({
       case (splatName: String, lastArgs: Seq[BlPattern]) => splatName -> lastArgs.toList
     }))
@@ -122,7 +132,16 @@ object Parser {
     case (cond: BlExpression, body: List[BlStatement]) => WhileStatement(cond, body)
   })
 
+  lazy val ifStatement: P[BlStatement] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ blockOfStatements ~ "}" ~
+    ("else" ~ "{" ~ blockOfStatements ~ "}").?).map({
+    case (cond: BlExpression, body: List[BlStatement], elseCase: Option[List[BlStatement]]) =>
+      IfStatement(cond, body, elseCase.getOrElse(Nil))
+  })
+
+
   lazy val blockOfStatements: P[List[BlStatement]] = P(stmt.rep).map(_.toList)
+
+  lazy val nakedBlockOfStatements = naked(blockOfStatements)
 
   lazy val stmt: P[BlStatement] = P(
       valDeclStatement
@@ -132,15 +151,14 @@ object Parser {
       | (expr ~ ";").map((e) => ExprStatement(e))
       | returnStatement
       | whileStatement
+      | ifStatement
     )
 
-  lazy val nakedStmt = P(stmt ~ End)
+  lazy val nakedStmt = naked(stmt)
 
-  lazy val functionBody = P("{" ~ blockOfStatements ~ "}")
+  def naked[A](p: P[A]): P[A] = P(myWhitespace ~ p ~ myWhitespace ~ End)
 
   def main(args: Array[String]): Unit = {
-    println(("{" ~ blockOfStatements ~ "}").parse(
-      """{ val x = 1; }
-      """.stripMargin).get.value)
+    println(naked(valDeclStatement).parse("val x = foo;").get.value)
   }
 }
