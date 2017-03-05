@@ -10,7 +10,7 @@ import interpreter._
 object Parser {
   val White = WhitespaceApi.Wrapper{
     import fastparse.all._
-    NoTrace(" ".rep)
+    NoTrace(CharIn(" ", "\n").rep)
   }
   import White._
   import fastparse.noApi._
@@ -57,18 +57,90 @@ object Parser {
     })
   })
 
+  lazy val exprLevel6: P[BlExpression] = P( exprLevel5 ~ (("==".! | "!=".! | ">".! | ">=".! | "<".! | "<=") ~ exprLevel5).?).map({
+    case (x: BlExpression, None) => x
+    case (lhs: BlExpression, Some((string: String, rhs: BlExpression))) =>
+      MethodCallExpr(lhs, string, List(LiteralFunctionArgument(rhs)))
+  })
+
+  lazy val exprLevel7: P[BlExpression] = P( exprLevel6 ~ ("&&" ~ exprLevel6).?).map({
+    case (x: BlExpression, None) => x
+    case (lhs: BlExpression, Some(rhs: BlExpression)) =>
+      MethodCallExpr(lhs, "&&", List(LiteralFunctionArgument(FunctionDefinitionExpr.lazyWrap(rhs))))
+  })
+
+  lazy val exprLevel8: P[BlExpression] = P( exprLevel7 ~ ("||" ~ exprLevel7).?).map({
+    case (x: BlExpression, None) => x
+    case (lhs: BlExpression, Some(rhs: BlExpression)) =>
+      MethodCallExpr(lhs, "||", List(LiteralFunctionArgument(FunctionDefinitionExpr.lazyWrap(rhs))))
+  })
+
 
   lazy val functionArgument: P[BlFunctionArgument] =
     P(expr.map(LiteralFunctionArgument) | ("..." ~ expr).map({ case (x) => SplatFunctionArgument(x)}))
 
 
-  lazy val expr: P[BlExpression] = exprLevel5
+  lazy val expr: P[BlExpression] = exprLevel8
 
   lazy val nakedExpr: P[BlExpression] = expr ~ End
 
+  lazy val simplePattern: P[BlPattern] = P(name).map(SingleVariablePattern)
+  lazy val arrayDestructurePattern: P[BlPattern] = P(
+    "[" ~ pattern.rep(sep=",") ~ ("," ~ "..." ~ name ~ ("," ~ pattern).rep).? ~ "]").map({
+    case (initials, splat) => ArrayDestructurePattern(initials.toList, splat.map({
+      case (splatName: String, lastArgs: Seq[BlPattern]) => splatName -> lastArgs.toList
+    }))
+  })
+  lazy val objectDestructurePattern: P[BlPattern] = P(
+    "{" ~ name.rep(sep=",") ~ ("," ~ "..." ~ name).? ~ "}").map({
+    case (initials, splatName) => ObjectDestructurePattern(initials.toSet, splatName)
+  })
+
+  lazy val pattern: P[BlPattern] = P(simplePattern | arrayDestructurePattern | objectDestructurePattern)
+
+  lazy val valDeclStatement: P[BlStatement] = P("val" ~ pattern ~ "=" ~ expr ~ ";").map({
+    case (p: BlPattern, e: BlExpression) => ValDeclStatement(p, e)
+  })
+
+  lazy val varDeclStatement: P[BlStatement] = P("var" ~ name ~ "=" ~ expr ~ ";").map({
+    case (name: String, e: BlExpression) => VarDeclStatement(name, e)
+  })
+
+  lazy val varSetStatement: P[BlStatement] = P(name ~ "=" ~ expr ~ ";").map({
+    case (name: String, e: BlExpression) => VarSetStatement(name, e)
+  })
+
+  lazy val fieldSetStatement: P[BlStatement] = P(exprLevel1 ~ "." ~ name ~ "=" ~ expr ~ ";").map({
+    case (lhs: BlExpression, name: String, e: BlExpression) => FieldSetStatement(lhs, name, e)
+  })
+
+  lazy val returnStatement: P[BlStatement] = P("return" ~ expr ~ ";").map({
+    case (e: BlExpression) => ReturnStatement(Some(e))
+  })
+
+  lazy val whileStatement: P[BlStatement] = P("while" ~ "(" ~ expr ~ ")" ~ "{" ~ blockOfStatements ~ "}").map({
+    case (cond: BlExpression, body: List[BlStatement]) => WhileStatement(cond, body)
+  })
+
+  lazy val blockOfStatements: P[List[BlStatement]] = P(stmt.rep).map(_.toList)
+
+  lazy val stmt: P[BlStatement] = P(
+      valDeclStatement
+      | varDeclStatement
+      | varSetStatement
+      | fieldSetStatement
+      | (expr ~ ";").map((e) => ExprStatement(e))
+      | returnStatement
+      | whileStatement
+    )
+
+  lazy val nakedStmt = P(stmt ~ End)
+
+  lazy val functionBody = P("{" ~ blockOfStatements ~ "}")
+
   def main(args: Array[String]): Unit = {
-    print(nakedExpr.parse("foo(bar)(baz)").get.value)
-
-
+    println(("{" ~ blockOfStatements ~ "}").parse(
+      """{ val x = 1; }
+      """.stripMargin).get.value)
   }
 }

@@ -4,6 +4,7 @@ package interpreter
   * Created by buck on 3/4/17.
   */
 
+
 import scala.collection.mutable
 
 abstract class BlValue {
@@ -108,20 +109,17 @@ abstract class BlCallable extends BlValue {
   def call(parameters: List[BlValue]): BlValue
 }
 
-case class BlFunctionDefinition(args: ArrayDestructurePattern,
-                                defaultVals: Map[String, BlValue],
-                                body: List[BlStatement],
+case class BlFunctionDefinition(expr: FunctionDefinitionExpr,
                                 scope: BlScope)
   extends BlCallable {
 
   def call(parameters: List[BlValue]): BlValue = {
     val newScope = new BlScope(None, Some(scope))
-    val destructuredArgs = args.destructure(BlList(parameters))
-    newScope.declareVals(destructuredArgs.get)
-    BlStatement.evalBlock(newScope, body).getOrElse(BlNull)
+    val destructuredArgs = expr.defaultVals ++ expr.args.destructure(BlList(parameters)).get
+    newScope.declareVals(destructuredArgs)
+    BlStatement.evalBlock(newScope, expr.body).getOrElse(BlNull)
   }
 }
-
 
 class BlObject(blClass: BlClass, initialFields: Map[String, BlValue]) extends BlValue {
   val fields: mutable.Map[String, BlValue] = mutable.Map() ++ initialFields

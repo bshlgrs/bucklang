@@ -14,5 +14,9 @@ abstract class BlFunctionArgument {
   }
 }
 
-case class LiteralFunctionArgument(value: BlExpression) extends BlFunctionArgument
-case class SplatFunctionArgument(value: BlExpression) extends BlFunctionArgument
+case class LiteralFunctionArgument(value: BlExpression) extends BlFunctionArgument {
+  override def toString: String = value.toString
+}
+case class SplatFunctionArgument(value: BlExpression) extends BlFunctionArgument {
+  override def toString: String = "..." + value.toString
+}

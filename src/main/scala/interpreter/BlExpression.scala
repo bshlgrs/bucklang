@@ -39,6 +39,9 @@ sealed abstract class BlExpression {
     case FieldAccessExpr(callee: BlExpression, name: String) => {
       callee.eval(scope).getField(name)
     }
+    case e: FunctionDefinitionExpr => {
+      BlFunctionDefinition(e, scope)
+    }
   }
 }
 
@@ -50,3 +53,10 @@ case class FunctionCallExpr(functionExpr: BlExpression, args: List[BlFunctionArg
 case class FieldAccessExpr(callee: BlExpression, name: String) extends BlExpression
 case object ThisExpr extends BlExpression
 case class NameExpr(name: String) extends BlExpression
+case class FunctionDefinitionExpr(args: ArrayDestructurePattern,
+                                  defaultVals: Map[String, BlValue],
+                                  body: List[BlStatement]) extends BlExpression
+
+object FunctionDefinitionExpr {
+  def lazyWrap(expr: BlExpression) = FunctionDefinitionExpr(ArrayDestructurePattern(Nil, None), Map(), List(ReturnStatement(Some(expr))))
+}

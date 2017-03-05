@@ -47,5 +47,5 @@ object ArrayDestructurePattern {
   def simple(vars: String*) = ArrayDestructurePattern(vars.toList.map(SingleVariablePattern), None)
 }
 
-case class ObjectDestructurePattern(names: Map[String, BlPattern], nameForRest: Option[String])
+case class ObjectDestructurePattern(names: Set[String], nameForRest: Option[String])
   extends BlPattern

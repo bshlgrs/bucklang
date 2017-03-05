@@ -22,9 +22,22 @@ class InitialSpec extends FunSpec  {
     }
   }
 
-  describe("Running modules") {
+  describe("Running blocks") {
     it("works") {
+      val code =
+        """{
+          |  val x = 5;
+          |  val y = 3;
+          |
+          |  return x + y;
+          |}
+        """.stripMargin
 
+      val parsedCode: List[BlStatement] = Parser.functionBody.parse(code).get.value
+
+      println(BlStatement.evalBlock(GlobalScope, parsedCode))
     }
   }
+
+
 }
