@@ -1,0 +1,17 @@
+target
+*.class
+*.iml
+*.ipr
+*.iws
+.idea
+out
+.DS_Store
+.cache/
+.history/
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/

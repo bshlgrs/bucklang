@@ -1,0 +1,12 @@
+print("Hello world!");
+
+print(1 + 2);
+
+val blah = 5;
+
+print(blah + 5);
+
+
+class Foo {
+
+}

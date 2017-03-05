@@ -1,0 +1,61 @@
+class TicTacToe(board) {
+  new () {
+    this.board = board || {}
+  }
+
+  addPiece!(x, y, piece) {
+    this.board = this.board.set([x, y], piece);
+  }
+
+  printBoard () => [0..2].map((y) => [0..2].map((x) => this.board.get([x, y], "-")).join("|")).join("\n")
+
+  ::positions = [0..2].cross([0..2])
+
+  winner () {
+    val rows = this.board.groupBy(_.get(0)).mapValues(_.values)
+    val cols = this.board.groupBy(_.get(1)).mapValues(_.values)
+    val leftDiag = this.board.filterKeys([x, y] => x == y).values
+    val rightDiag = this.board.filterKeys([x, y] => x + y == 3).values
+
+    val threes = rows ++ cols ++ [leftDiag, rightDiag]
+    // or
+    val threes = [...rows, ...cols, leftDiag, rightDiag]
+
+    threes.filter(_.uniq().length() == 3).head
+  }
+}
+
+class TTTAI {
+  ::move(board, piece) {
+    return TicTacToe::positions.shuffle().filter(p => !board.has(p)).head();
+  }
+
+  ::smartMove(board, piece) {
+    val emptyMoves = TicTacToe::positions - board.keys();
+
+    (emptyMoves.filter((m) => TicTacToe(board.set(m, piece).winner() == piece)) ++
+     emptyMoves.filter((m) => TicTacToe(board.set(m, piece).winner())) ++
+        ::move(board, piece)).head
+  }
+}
+
+val main = () => {
+  var currentPlayer = 0
+  val board = TicTacToe()
+
+  9.times((t) => {
+    (t % 2) match {
+      case 0 => {
+        val [x, y] = getValidatedInput("%d %d", ([x, y]) => (board.has([x, y]) && "That place is taken"))
+
+        board.addPiece!(x, y, "X")
+      }
+      case 1 => {
+        val [x, y] = TTTAI::move(board, "O")
+        board.addPiece(x, y, "O")
+      };
+    }
+    print(board.printBoard())
+  }})
+}
+
