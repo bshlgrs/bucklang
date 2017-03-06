@@ -42,6 +42,14 @@ class ParserSpec extends FunSpec  {
       assert(expr.functionExpr == LiteralExpr(BlListClass))
     }
 
+    it ("can do map literals") {
+      val expr = parse("{a: 1}").asInstanceOf[MethodCallExpr]
+    }
+
+    it ("can do string literals") {
+      val expr = parse("\"foobar\"").asInstanceOf[LiteralExpr]
+    }
+
     it ("can do method calls") {
       val expr = parse("foo.bar()").asInstanceOf[MethodCallExpr]
       assert(expr.calleeExpr == NameExpr("foo"))

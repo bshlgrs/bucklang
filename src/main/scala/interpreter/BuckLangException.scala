@@ -6,3 +6,5 @@ package interpreter
 class BuckLangException(s: String) extends RuntimeException(s) {
 
 }
+
+class BuckLangValueError(s: String, v: BlValue) extends BuckLangException(s ++ "\n\n" ++ v.toString)

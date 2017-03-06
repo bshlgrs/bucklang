@@ -26,26 +26,57 @@ object Parser {
   lazy val arrayLiteral: P[BlExpression] = P("[" ~ functionArgument.rep(sep = ",") ~ "]")
     .map({ case (x: Seq[BlFunctionArgument]) => FunctionCallExpr(LiteralExpr(BlListClass), x.toList)})
 
+  lazy val objectLiteral: P[BlExpression] =
+    P("{" ~ objectLiteralArgument.rep(sep = ",") ~ "}")
+    .map({ case (x: Seq[Either[(BlExpression, BlExpression), BlExpression]]) => {
+      val emptyMap = LiteralExpr(BlMap(Map()))
+
+      x.toList.foldLeft[BlExpression](emptyMap)({
+        case (map: BlExpression, Left((fieldName: BlExpression, value: BlExpression))) =>
+          MethodCallExpr(map, "set", List(LiteralFunctionArgument(fieldName), LiteralFunctionArgument(value))) : MethodCallExpr
+        case (map: BlExpression, Right(map2: BlExpression)) =>
+          MethodCallExpr(map, "++", List(LiteralFunctionArgument(map2)))
+      })
+    }})
+
+  lazy val objectLiteralArgument: P[Either[(BlExpression, BlExpression), BlExpression]] =
+    P(
+      ("[" ~ name ~ "]" ~ ":" ~ expr).map({ case (s: String, e: BlExpression) => Left(NameExpr(s) -> e) }) |
+      (name ~ ":" ~ expr).map({ case (s: String, e: BlExpression) => Left(LiteralExpr(BlString(s)) -> e) }) |
+      (expr ~ ":" ~ expr).map({ case (s: BlExpression, e: BlExpression) => Left(s -> e) }) |
+      ("..." ~ expr).map({ case (e: BlExpression) => Right(e) })
+    )
+
+  lazy val stringLiteral: P[BlExpression] = P("\"" ~ CharIn('a' to 'z', 'A' to 'Z', '0' to '9').rep.! ~ "\"").map((x) =>
+    LiteralExpr(BlString(x)))
+
   lazy val nameExpr: P[NameExpr] = name.map((x) => NameExpr(x))
 
   lazy val thisExpr: P[BlExpression] = P("this").map((_) => ThisExpr)
 
-  lazy val exprLevel1: P[BlExpression] = P(thisExpr | numberExpr | nameExpr | parensExpr | arrayLiteral)
+  lazy val exprLevel1: P[BlExpression] = P(thisExpr | numberExpr | nameExpr | parensExpr | arrayLiteral | objectLiteral | stringLiteral)
 
   lazy val exprLevel2: P[BlExpression] = P(
-    exprLevel1 ~ (
+    CharIn("!", "-").!.rep ~ exprLevel1 ~ (
       ("." ~ name ~ ("(" ~ functionArgument.rep(sep = ",") ~ ")")) |
         ("." ~ name) |
         ("(" ~ functionArgument.rep(sep = ",") ~ ")")
       ).rep ).map({
-    case (callee: BlExpression, args: Seq[Object]) => args.foldLeft(callee) ({
-      case (callee2: BlExpression, (name: String, args: Seq[BlFunctionArgument])) =>
-        MethodCallExpr(callee2, name, args.toList)
-      case (callee2: BlExpression, (name: String)) =>
-        FieldAccessExpr(callee2, name)
-      case (callee2: BlExpression, (args: Seq[BlFunctionArgument])) =>
-        FunctionCallExpr(callee2, args.toList)
-    })
+    case (unaryOps: Seq[String], callee: BlExpression, args: Seq[Object]) => {
+      val mainExpr = args.foldLeft(callee) ({
+        case (callee2: BlExpression, (name: String, args: Seq[BlFunctionArgument])) =>
+          MethodCallExpr(callee2, name, args.toList)
+        case (callee2: BlExpression, (name: String)) =>
+          FieldAccessExpr(callee2, name)
+        case (callee2: BlExpression, (args: Seq[BlFunctionArgument])) =>
+          FunctionCallExpr(callee2, args.toList)
+      })
+
+      unaryOps.foldLeft(mainExpr) ({
+        case (e: BlExpression, "-") => MethodCallExpr(e, "__negate__", List())
+        case (e: BlExpression, "!") => MethodCallExpr(e, "__not__", List())
+      })
+    }
   })
 
   lazy val exprLevel4: P[BlExpression] = P( exprLevel2 ~ (CharIn("*/").! ~/ exprLevel2).rep ).map({
@@ -54,7 +85,7 @@ object Parser {
     })
   })
 
-  lazy val exprLevel5: P[BlExpression] = P( exprLevel4 ~ (CharIn("+-").! ~/ exprLevel4).rep ).map({
+  lazy val exprLevel5: P[BlExpression] = P( exprLevel4 ~ (StringIn("+", "-", "++").! ~/ exprLevel4).rep ).map({
     case (exp: BlExpression, rest: Seq[(String, BlExpression)]) => rest.foldLeft(exp)({
       case (l, (char, r)) => MethodCallExpr(l, char, List(LiteralFunctionArgument(r)))
     })
@@ -80,6 +111,7 @@ object Parser {
 
   lazy val functionArgument: P[BlFunctionArgument] =
     P(expr.map(LiteralFunctionArgument) | ("..." ~ expr).map({ case (x) => SplatFunctionArgument(x)}))
+
 
   lazy val functionDefinitionExpr: P[BlExpression] = P(
     "(" ~ arrayDestructurePatternInner ~ ")" ~ "=>" ~ (exprLevel9 | "{" ~ blockOfStatements ~ "}")).map({
@@ -159,6 +191,6 @@ object Parser {
   def naked[A](p: P[A]): P[A] = P(myWhitespace ~ p ~ myWhitespace ~ End)
 
   def main(args: Array[String]): Unit = {
-    println(naked(valDeclStatement).parse("val x = foo;").get.value)
+    println(naked(objectLiteral).parse("{a: 1}").get.value)
   }
 }

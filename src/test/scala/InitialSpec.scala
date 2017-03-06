@@ -32,9 +32,7 @@ class InitialSpec extends FunSpec  {
 
     it("works") {
       val code =
-        """
-           val x = range(10);
-
+        """val x = range(10);
            return x.size * 5;
         """.stripMargin
 
@@ -55,13 +53,22 @@ class InitialSpec extends FunSpec  {
 
     it("can do another function definition") {
       val code =
-        """
-           val factorial = (x) => { if (x == 0) { return 1; } else { return x * factorial(x - 1); } };
+        """ val factorial = (x) => { if (x == 0) { return 1; } else { return x * factorial(x - 1); } };
 
            return factorial(10);
         """.stripMargin
 
       assert(parseAndRunBlock(code) == BlInt(3628800))
+    }
+
+    it("can use objects") {
+      val code =
+        """
+          |val object = { a: 1, b: 2, c: 5 };
+          |return object.get("a") + object.get("b") + object.get("c");
+        """.stripMargin
+
+      assert(parseAndRunBlock(code) == BlInt(8))
     }
   }
 
