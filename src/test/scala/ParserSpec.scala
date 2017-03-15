@@ -47,7 +47,7 @@ class ParserSpec extends FunSpec  {
     }
 
     it ("can do string literals") {
-      val expr = parse("\"foobar\"").asInstanceOf[LiteralExpr]
+      val expr = parse("\"foob \\nar\"").asInstanceOf[LiteralExpr]
     }
 
     it ("can do method calls") {
@@ -73,14 +73,23 @@ class ParserSpec extends FunSpec  {
 
     it ("can do name expr") {
       assert(parse("foo").asInstanceOf[NameExpr].name == "foo")
+      assert(parse("foo_bar").asInstanceOf[NameExpr].name == "foo_bar")
+      assert(parse("foo_bar2").asInstanceOf[NameExpr].name == "foo_bar2")
     }
 
-    it ("can do function definition exprs") {
-      assert(parse("(x, y) => x + y").isInstanceOf[FunctionDefinitionExpr])
-      assert(parse("(x, y) => { val z = x + y; return x + z * z; }").isInstanceOf[FunctionDefinitionExpr])
-      assert(parse("(x) => { val z = x + y; return x + z * z; }").isInstanceOf[FunctionDefinitionExpr])
-      assert(parse("(x) => { if (x == 0) { return 1; } else { return x * factorial(x - 1); } }").isInstanceOf[FunctionDefinitionExpr])
+    describe("function definition") {
+      it ("can do simple ones") {
+        assert(parse("(x, y) => x + y").isInstanceOf[FunctionDefinitionExpr])
+        assert(parse("(x, y) => { val z = x + y; return x + z * z; }").isInstanceOf[FunctionDefinitionExpr])
+        assert(parse("(x) => { val z = x + y; return x + z * z; }").isInstanceOf[FunctionDefinitionExpr])
+        assert(parse("(x) => { if (x == 0) { return 1; } else { return x * factorial(x - 1); } }").isInstanceOf[FunctionDefinitionExpr])
+      }
+
+      it ("can deal with underscores") {
+        assert(parse("(_, y) => y").isInstanceOf[FunctionDefinitionExpr])
+      }
     }
+
   }
 
   describe("Parsing statements") {

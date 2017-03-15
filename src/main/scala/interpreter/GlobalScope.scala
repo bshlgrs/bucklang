@@ -8,7 +8,7 @@ object GlobalScope extends BlScope(None, None) {
   declareVal("List", BlListClass)
 
   object range extends BlCallable {
-    def call(params: List[BlValue]): BlValue = params match {
+    override def call(params: List[BlValue]): BlValue = params match {
       case List(x) => x match {
         case BlInt(r) => BlList(List.range(0, r).map(BlInt))
         case _ => throw new BuckLangException(s"$x is not an int")

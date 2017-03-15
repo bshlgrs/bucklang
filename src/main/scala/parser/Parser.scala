@@ -9,6 +9,12 @@ import fastparse.all._
 import interpreter._
 
 object Parser {
+  case class NamedFunction[T, V](f: T => V, name: String) extends (T => V){
+    def apply(t: T) = f(t)
+    override def toString() = name
+
+  }
+
   lazy val myWhitespace = CharIn(" ", "\n").rep
 
   val White = WhitespaceApi.Wrapper{
@@ -18,7 +24,10 @@ object Parser {
   import White._
   import fastparse.noApi._
 
-  lazy val name: P[String] = P((CharIn('a' to 'z', 'A' to 'Z').repX(1) ~ ("!" | "?").?).!)
+  lazy val name: P[String] = P(
+    CharIn('a' to 'z', 'A' to 'Z', Seq('_')) ~ CharIn('a' to 'z', 'A' to 'Z', Seq('_'), '0' to '9').rep ~ ("!" | "?").?).!
+//  lazy val name: P[String] = P(CharIn('a' to 'z', 'A' to 'Z') ~ CharIn('a' to 'z', 'A' to 'Z', Seq('_')).repX(1) ~ ("!" | "?").?).!
+
   val number: P[BlInt] = P( CharIn('0'to'9').rep(1).!.map({case (x: String) => BlInt(x.toInt)}))
   lazy val numberExpr: P[BlExpression] = number.map((x) => LiteralExpr(x))
 
@@ -47,8 +56,18 @@ object Parser {
       ("..." ~ expr).map({ case (e: BlExpression) => Right(e) })
     )
 
-  lazy val stringLiteral: P[BlExpression] = P("\"" ~ CharIn('a' to 'z', 'A' to 'Z', '0' to '9').rep.! ~ "\"").map((x) =>
-    LiteralExpr(BlString(x)))
+
+
+  val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
+
+  val StringChars = NamedFunction(!"\"\\".contains(_: Char), "StringChars")
+
+  val hexDigit      = P( CharIn('0'to'9', 'a'to'f', 'A'to'F') )
+  val unicodeEscape = P( "u" ~ hexDigit ~ hexDigit ~ hexDigit ~ hexDigit )
+  val escape        = P( "\\" ~ (CharIn("\"/\\bfnrt") | unicodeEscape) )
+  val strChars = P( CharsWhile(StringChars) )
+  val stringLiteral =
+    P("\"" ~/ (strChars | escape).rep.! ~ "\"").map((x) => LiteralExpr(BlString(x)))
 
   lazy val nameExpr: P[NameExpr] = name.map((x) => NameExpr(x))
 
@@ -138,7 +157,11 @@ object Parser {
     case (initials, splatName) => ObjectDestructurePattern(initials.toSet, splatName)
   })
 
-  lazy val pattern: P[BlPattern] = P(simplePattern | arrayDestructurePattern | objectDestructurePattern)
+  lazy val pattern: P[BlPattern] = P(
+    simplePattern
+      | arrayDestructurePattern
+      | objectDestructurePattern
+      | P("_").map((_) => UnderscorePattern ))
 
   lazy val valDeclStatement: P[BlStatement] = P("val" ~ pattern ~ "=" ~ expr ~ ";").map({
     case (p: BlPattern, e: BlExpression) => ValDeclStatement(p, e)
@@ -180,13 +203,34 @@ object Parser {
       | varDeclStatement
       | varSetStatement
       | fieldSetStatement
-      | (expr ~ ";").map((e) => ExprStatement(e))
       | returnStatement
+      | (expr ~ ";").map((e) => ExprStatement(e))
       | whileStatement
       | ifStatement
     )
 
   lazy val nakedStmt = naked(stmt)
+
+  lazy val fieldInClass: P[(Boolean, String, BlExpression)] = {
+    val functionField = P(name ~ "(" ~ arrayDestructurePatternInner ~ ")" ~ "{" ~ blockOfStatements ~ "}").map({
+      case (name: String, args: ArrayDestructurePattern, statements: List[BlStatement]) =>
+        (false, name, FunctionDefinitionExpr(args, Map(), statements))
+    })
+
+    val staticField = P(name ~ "=" ~ expr).map({ case (name: String, expr: BlExpression) => (false, name, expr)})
+
+    P(
+      functionField | staticField
+    )
+  }
+
+//  lazy val classDef: P[BlStatement] = P(
+//    "class" ~ name ~
+//      "(" ~ name.rep(sep=",") ~ ")" ~ "{" ~ fieldInClass.rep ~ "}").map({
+//    case (name: String, args: ArrayDestructurePattern, fields: Seq[(Boolean, String, BlExpression)]) => {
+//      ClassDeclStatement(SingleVariablePattern(name), )
+//    }
+//  })
 
   def naked[A](p: P[A]): P[A] = P(myWhitespace ~ p ~ myWhitespace ~ End)
 

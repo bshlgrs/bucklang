@@ -70,6 +70,23 @@ class InitialSpec extends FunSpec  {
 
       assert(parseAndRunBlock(code) == BlInt(8))
     }
+
+    describe("Arrays") {
+      it("can use arrays") {
+        val code =
+          """
+            |val array = [5, 2, 3].set(1, 5);
+            |return array.get(0) + array.get(1) + array.get(2) - array.sum();
+          """.stripMargin
+
+        assert(parseAndRunBlock(code) == BlInt(0))
+      }
+
+      it("can use `map`") {
+        assert(parseAndRunBlock("return [5, 2, 3].map((x) => x * 2).sum();") == BlInt(20))
+      }
+    }
+
   }
 
 

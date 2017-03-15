@@ -33,6 +33,7 @@ abstract class BlPattern {
         }
       }
     }
+    case UnderscorePattern => Success(Map())
   }
 }
 
@@ -40,7 +41,17 @@ case class SingleVariablePattern(name: String) extends BlPattern
 case class ArrayDestructurePattern(initialPatterns: List[BlPattern],
                                    splat: Option[(String, List[BlPattern])]
                                   ) extends BlPattern {
-
+  def destructureAllowingExtras(list: List[BlValue]): Try[Map[String, BlValue]] = {
+    if (list.length < initialPatterns.length + splat.map(_._2.length).getOrElse(0)) {
+      Failure(new BuckLangException("Too few elements in array to fit to destructure"))
+    } else {
+      splat match {
+        case None => Utils.listOfTriesIntoTryOfList(list.zip(initialPatterns)
+          .map({ case (v: BlValue, pat: BlPattern) => pat.destructure(v) })).map((x) => x.reduce(_ ++ _))
+        case _ => ???
+      }
+    }
+  }
 }
 
 object ArrayDestructurePattern {
@@ -49,3 +60,5 @@ object ArrayDestructurePattern {
 
 case class ObjectDestructurePattern(names: Set[String], nameForRest: Option[String])
   extends BlPattern
+
+case object UnderscorePattern extends BlPattern

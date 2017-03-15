@@ -17,7 +17,7 @@ abstract class BlValue {
     getMethod(name) match {
       case None => throw new RuntimeException(s"No method $name on object $this")
       case Some((arity, method)) => {
-        if (arity != flattenedArgs.length) {
+        if (arity < flattenedArgs.length) {
           throw new RuntimeException(s"Called the method $name on $this with ${flattenedArgs.length} args; needs $arity")
         } else {
           method(flattenedArgs)
@@ -32,7 +32,6 @@ abstract class BlValue {
 
   type InbuiltMethod = (Int, List[BlValue] => BlValue)
 
-
   def inbuiltMethods: Map[String, InbuiltMethod]
 
   val universalMethods = Map[String, InbuiltMethod](
@@ -40,7 +39,7 @@ abstract class BlValue {
     "||" -> (1 -> {case List(x: BlValue) => this.or(x) }),
     "==" -> (1 -> {case List(x: BlValue) => BlBool(this == x) }),
     "!=" -> (1 -> {case List(x: BlValue) => BlBool(this != x) }),
-    "__not__" -> (0 -> {case List() => BlBool(!this.truthy) })
+    "__not__" -> (0 -> {case List(_) => BlBool(!this.truthy) })
   )
 
   def and(other: BlValue): BlValue = {
@@ -69,6 +68,12 @@ abstract class BlValue {
   def setField(field: String, value: BlValue): Unit = throw new BuckLangException(s"can't set fields on $this (tried to set $field)")
 
   def objectFields: Map[String, () => BlValue] = Map()
+
+  def call(parameters: List[BlValue]): BlValue = {
+    throw new BuckLangValueError(s"can't use $this as function", this)
+  }
+
+  def toInt(): Int = throw new BuckLangValueError("not an integer", this)
 }
 
 case class BlInt(int: Int) extends BlValue {
@@ -85,7 +90,7 @@ case class BlInt(int: Int) extends BlValue {
     "<" -> (1 -> {case List(x: BlValue) => this.comparisonOperate(x, (a: Int, b: Int) => a < b) }),
     ">=" -> (1 -> {case List(x: BlValue) => this.comparisonOperate(x, (a: Int, b: Int) => a >= b) }),
     "<=" -> (1 -> {case List(x: BlValue) => this.comparisonOperate(x, (a: Int, b: Int) => a <= b) }),
-    "__negate__" -> (0 -> {case List() => BlInt(-int) })
+    "__negate__" -> (0 -> {case _ => BlInt(-int) })
   )
 
   def numericalOperate(other: BlValue, f: (Int, Int) => Int): BlValue = other match {
@@ -96,6 +101,8 @@ case class BlInt(int: Int) extends BlValue {
   def comparisonOperate(other: BlValue, f: (Int, Int) => Boolean): BlValue = other match {
     case BlInt(otherInt) => BlBool(f(this.int, otherInt))
   }
+
+  override def toInt(): Int = this.int
 }
 
 case class BlString(string: String) extends BlValue {
@@ -128,16 +135,16 @@ abstract class BlCallable extends BlValue {
 
   val inbuiltMethods: Map[String, (Int, (List[BlValue]) => BlValue)] = Map()
 
-  def call(parameters: List[BlValue]): BlValue
+
 }
 
 case class BlFunctionDefinition(expr: FunctionDefinitionExpr,
                                 scope: BlScope)
   extends BlCallable {
 
-  def call(parameters: List[BlValue]): BlValue = {
+  override def call(parameters: List[BlValue]): BlValue = {
     val newScope = new BlScope(None, Some(scope))
-    val destructuredArgs = expr.defaultVals ++ expr.args.destructure(BlList(parameters)).get
+    val destructuredArgs = expr.defaultVals ++ expr.args.destructureAllowingExtras(parameters).get
     newScope.declareVals(destructuredArgs)
     BlStatement.evalBlock(newScope, expr.body).getOrElse(BlNull)
   }
@@ -194,11 +201,21 @@ case class BlList(list: List[BlValue]) extends BlValue {
     "append" -> (1 -> {case (List(v: BlValue)) => BlList(list :+ v)}),
     "prepend" -> (1 -> {case (List(v: BlValue)) => BlList(v +: list)}),
     "++" -> (1 -> {case (List(v: BlList)) => BlList(list ++ v.list)}),
-    "map" -> (1 -> {case (List(v: BlCallable)) => BlList(list.map((x) => v.call(List(x))))}),
-    "filter" -> (1 -> {case (List(v: BlCallable)) => BlList(list.filter((x) => v.call(List(x)).truthy))})
-//    "reduce" -> (1 -> {case (List(v: BlCallable)) => {
-//
-//    }})
+    "map" -> (1 -> {case (List(v: BlCallable)) => BlList(list.zipWithIndex.map({case (x, idx) => v.call(List(x, BlInt(idx)))}))}),
+    "each" -> (1 -> {case (List(v: BlCallable)) => {
+      list.zipWithIndex.foreach({case (x, idx) => v.call(List(x, BlInt(idx)))})
+      this
+    }}),
+    "filter" -> (1 -> {case (List(v: BlCallable)) => BlList(list.filter((x) => v.call(List(x)).truthy))}),
+    "reduce" -> (1 -> {
+      case (List(f: BlValue, zero: BlValue)) => {
+        list.foldLeft(zero)({case (acc: BlValue, item: BlValue) => f.call(List(acc, item))})
+      }
+      case (List(f: BlCallable)) => {
+        list.reduceOption((x, y) => f.call(List(x, y))).getOrElse(BlNull)
+      }
+    }),
+    "sum" -> (0 -> (_ => BlInt(list.map(_.toInt()).sum)))
   )
 
   override val objectFields = Map("size" -> (() => BlInt(list.size)))

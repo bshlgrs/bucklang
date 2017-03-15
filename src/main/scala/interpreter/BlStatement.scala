@@ -4,8 +4,6 @@ package interpreter
   * Created by buck on 3/4/17.
   */
 
-import scala.util.control.Breaks._
-
 abstract class BlStatement {
   def eval(scope: BlScope): Option[BlValue] = this match {
     case ValDeclStatement(lhs, rhs) => scope.declareVals(lhs.destructure(rhs.eval(scope)).get) ; None
@@ -51,3 +49,4 @@ case class ExprStatement(exp: BlExpression) extends BlStatement
 case class ReturnStatement(value: Option[BlExpression]) extends BlStatement
 case class WhileStatement(cond: BlExpression, body: List[BlStatement]) extends BlStatement
 case class IfStatement(cond: BlExpression, thenCase: List[BlStatement], elseCase: List[BlStatement]) extends BlStatement
+//case class ClassDeclStatement(name: String, args: List[(String, Option[BlExpression])], )

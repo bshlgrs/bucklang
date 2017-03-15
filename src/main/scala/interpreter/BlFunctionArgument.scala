@@ -9,7 +9,7 @@ abstract class BlFunctionArgument {
     case LiteralFunctionArgument(x) => List(x.eval(s))
     case SplatFunctionArgument(x) => x.eval(s) match {
       case BlList(list) => list
-      case x => throw new BuckLangException(s"You tried to splat $x, but it is not a list :(")
+      case _ => throw new BuckLangException(s"You tried to splat $x, but it is not a list :(")
     }
   }
 }
